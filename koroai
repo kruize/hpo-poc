@@ -1,0 +1,269 @@
+#!/usr/bin/env python3
+
+import os
+import json
+import yaml
+import argparse
+import shutil
+import subprocess
+
+default_dir_name = 'katib'
+default_tag = 'v0.16.0'
+default_repo = 'https://github.com/kubeflow/katib.git'
+
+DN_KATIB_CONTROLLER = 'katib-controller'
+DN_KATIB_DB_MAN = 'katib-db-manager'
+DN_KATIB_DB = 'katib-mysql'
+DN_KATIB_UI = 'katib-ui'
+
+KATIB_INJECTION_LABEL_KEY = 'katib.kubeflow.org/metrics-collector-injection'
+KATIB_INJECTION_LABEL_VAL = 'enabled'
+
+KATIB_CONFIG_FILE_NAME = "katib-config.yaml"
+KUSTOMIZATION_FILE_NAME = "kustomization.yaml"
+
+KATIB_STANDALONE = 'katib/manifests/v1beta1/installs/katib-standalone'
+KATIB_RHODS = 'katib/manifests/v1beta1/installs/katib-rhods'
+
+
+class Color:
+    PURPLE = '\033[95m'
+    CYAN = '\033[96m'
+    DARKCYAN = '\033[36m'
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    END = '\033[0m'
+
+
+INFO = f'{Color.CYAN}[INFO]{Color.END}'
+ERR = f'{Color.RED}[ERR]{Color.END}'
+
+DONE = f'{Color.GREEN}DONE{Color.END}'
+FAILED = f'{Color.RED}FAILED{Color.RED}'
+
+
+def check_oc():
+    try:
+        print(f"{INFO} Checking for OpenShift Client (OC) installation ... ", end='')
+        subprocess.check_output(['oc', 'version'])
+
+    except subprocess.CalledProcessError:
+        print(f"{FAILED}")
+        print(
+            f"{ERR} OpenShift client (oc) is not installed. Please install OpenShift client and run the program again.")
+        exit(1)
+    print(f'{DONE}')
+
+
+def check_namespace(installation_namespace: str):
+    try:
+        print(f'{INFO} Checking for namespace ... ', end='')
+        result = subprocess.check_output(
+            ['oc', 'get', 'namespaces', '-o', 'name'],
+            universal_newlines=True)
+
+        namespaces = result.strip().replace('namespace/', '').split('\n')
+
+        if installation_namespace in namespaces:
+            print(f"{DONE}")
+            print(f"{INFO} Found Namespace: '{installation_namespace}'")
+        else:
+            print(f"{FAILED}")
+            print(f"{ERR} Invalid Namespace: '{installation_namespace}'")
+            exit(1)
+    except subprocess.CalledProcessError:
+        print(f"{FAILED}")
+        print(f"{ERR} Failed to get namespaces")
+        exit(1)
+
+
+def check_deployment(namespace_to_check: str, deployment_name: str):
+    try:
+        print(f'{INFO} Checking for Katib Deployment ... ', end='')
+        result = subprocess.check_output(
+            ['oc', '-n', namespace_to_check, 'get', 'deployments', '-o', 'name'],
+            universal_newlines=True)
+
+        deployments = result.strip().split('\n')
+        print(f"{DONE}")
+        if f"deployment.apps/{deployment_name}" in deployments:
+            print(f"{INFO} Found Deployment: '{deployment_name}' in namespace: '{namespace_to_check}'")
+            print(f"{ERR} Katib Controller is already installed. Exiting")
+            exit(1)
+    except subprocess.CalledProcessError:
+        print(f"{FAILED}")
+        print(f"{ERR} Failed to get deployments")
+        exit(1)
+
+
+def check_and_add_label(namespace_to_check: str, label: str, value: str):
+    try:
+        print(f'{INFO} Checking for Label ... ', end='')
+        result = subprocess.check_output(
+            ['oc', 'get', 'namespace', namespace_to_check, '-o', 'json'],
+            universal_newlines=True)
+
+        namespace_info = json.loads(result)
+        labels = namespace_info['metadata'].get('labels', {})
+
+        if label in labels and labels[label] == value:
+            print(f"{DONE}")
+            print(
+                f"{INFO} Found Label: '{Color.YELLOW}{label}{Color.END}' with value: '{Color.YELLOW}{value}{Color.END}' in namespace: '{Color.CYAN}{namespace_to_check}{Color.END}'")
+        else:
+            print(f"{FAILED}")
+            print(
+                f"{INFO} Adding Label: '{Color.YELLOW}{label}{Color.END}' with value: '{Color.YELLOW}{value}{Color.END}' to namespace: '{Color.CYAN}{namespace_to_check}{Color.END}'")
+            subprocess.run(['oc', 'label', 'namespace', namespace_to_check, f'{label}={value}'], check=True)
+    except subprocess.CalledProcessError:
+        print(f"{FAILED}")
+        print(f"{ERR} Failed to get or add label")
+        exit(1)
+
+
+def copy_yaml(src_file: str, dst_file: str):
+    try:
+        print(f'{INFO} Copying YAML {Color.YELLOW}{src_file}{Color.END} to {Color.YELLOW}{dst_file}{Color.END} ... ', end='')
+        with open(src_file, 'r') as file:
+            data = yaml.safe_load(file)
+
+        os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+
+        with open(dst_file, 'w') as file:
+            yaml.safe_dump(data, file)
+
+        print(f"{DONE}")
+        print(f"{INFO} Copied YAML file: '{src_file}' and saved to: '{dst_file}'")
+    except Exception as e:
+        print(f"{FAILED}")
+        print(f"{ERR} Failed to modify YAML file: {str(e)}")
+        exit(1)
+
+
+def modify_yaml(src_file: str, dst_file: str, target_namespace: str):
+    try:
+        print(f'{INFO} Modifying YAML {Color.YELLOW}{src_file}{Color.END} to {Color.YELLOW}{dst_file}{Color.END} ... ', end='')
+        with open(src_file, 'r') as file:
+            data = yaml.safe_load(file)
+
+        data['namespace'] = target_namespace
+
+        data['resources'].remove('../../components/namespace/')
+
+        os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+
+        with open(dst_file, 'w') as file:
+            yaml.safe_dump(data, file)
+
+        print(f"{DONE}")
+        print(f"{INFO} Modified YAML file: '{src_file}' and saved to: '{dst_file}'")
+    except Exception as e:
+        print(f"{FAILED}")
+        print(f"{ERR} Failed to modify YAML file: {str(e)}")
+        exit(1)
+
+
+def apply_yamls(directory: str):
+    try:
+        print(f'{INFO} Applying YAML files')
+        subprocess.run(['oc', 'apply', '-k', directory], check=True)
+        print(f"{INFO} Successfully applied YAML files in: '{Color.YELLOW}{directory}{Color.END}'")
+    except subprocess.CalledProcessError:
+        print(f"{ERR} Failed to apply YAML files")
+        exit(1)
+
+
+def check_git():
+    try:
+        print(f'{INFO} Checking for GIT installation ... ', end='')
+        subprocess.check_output(['git', '--version'])
+    except subprocess.CalledProcessError:
+        print(f"{FAILED}")
+        print(f"{ERR} Git is not installed. Please install GIT and run the program again.")
+        exit(1)
+
+    print(f"{DONE}")
+
+
+def clone_tag(repo_url, tag_name, target_directory):
+    try:
+        subprocess.check_output(['git', 'ls-remote', '--tags', '--exit-code', repo_url, tag_name])
+    except subprocess.CalledProcessError:
+        print(f"{ERR} Invalid tag: {tag_name}")
+        exit(1)
+    subprocess.run(['git', 'clone', '-b', tag_name, repo_url, target_directory], check=True)
+
+
+def entry():
+    print("""
+        oooo    oooo   .oooooo.   ooooooooo.     .oooooo.         .o.       ooooo 
+        `888   .8P'   d8P'  `Y8b  `888   `Y88.  d8P'  `Y8b       .888.      `888' 
+         888  d8'    888      888  888   .d88' 888      888     .8"888.      888  
+         88888[      888      888  888ooo88P'  888      888    .8' `888.     888  
+         888`88b.    888      888  888`88b.    888      888   .88ooo8888.    888  
+         888  `88b.  `88b    d88'  888  `88b.  `88b    d88'  .8'     `888.   888  
+        o888o  o888o  `Y8bood8P'  o888o  o888o  `Y8bood8P'  o88o     o8888o o888o
+        
+        
+        Welcome to KOROAI Tool! 
+        For Usage: koroai -h
+        
+        Koroai expects OpenShift Client is installed and logged in to a OpenShift Cluster
+    """)
+
+
+parser = argparse.ArgumentParser(description='Katib on Redhat OpenShift AI (KOROAI) tool')
+
+parser.add_argument('--repo',
+                    default=default_repo,
+                    help='The URL of the Git repository.')
+
+parser.add_argument('--tag',
+                    default=default_tag,
+                    help='The name of the tag.')
+
+parser.add_argument('--target',
+                    default=f'./{default_dir_name}',
+                    help='The directory where the repository should be cloned. Default is the katib dir in current working directory.')
+
+parser.add_argument('--nocache',
+                    action='store_true',
+                    help='Delete the target directory even if it\'s not empty.')
+
+parser.add_argument('--namespace',
+                    required=True,
+                    help='Name of the namespace where katib needs to be installed')
+
+entry()
+
+args = parser.parse_args()
+
+namespace = args.namespace
+
+check_oc()
+check_namespace(namespace)
+check_deployment(namespace, DN_KATIB_CONTROLLER)
+check_and_add_label(namespace_to_check=namespace,
+                    label=KATIB_INJECTION_LABEL_KEY,
+                    value=KATIB_INJECTION_LABEL_VAL)
+
+if args.nocache and os.path.isdir(default_dir_name):
+    print(f"{INFO} Deleting existing cache: {default_dir_name}")
+    shutil.rmtree(default_dir_name)
+
+if not os.path.isdir(default_dir_name):
+    check_git()
+    clone_tag(args.repo, args.tag, args.target)
+
+copy_yaml(src_file=f'{KATIB_STANDALONE}/{KATIB_CONFIG_FILE_NAME}',
+          dst_file=f'{KATIB_RHODS}/{KATIB_CONFIG_FILE_NAME}')
+
+modify_yaml(src_file=f'{KATIB_STANDALONE}/{KUSTOMIZATION_FILE_NAME}',
+            dst_file=f'{KATIB_RHODS}/{KUSTOMIZATION_FILE_NAME}',
+            target_namespace=namespace)
+
+apply_yamls(directory=KATIB_RHODS)
