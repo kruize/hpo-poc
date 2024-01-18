@@ -21,6 +21,7 @@ KATIB_INJECTION_LABEL_VAL = 'enabled'
 
 KATIB_CONFIG_FILE_NAME = "katib-config.yaml"
 KUSTOMIZATION_FILE_NAME = "kustomization.yaml"
+ROLE_BINDING_FILE_NAME = "wrk-bench-role-binding.yaml"
 
 KATIB_STANDALONE = 'katib/manifests/v1beta1/installs/katib-standalone'
 KATIB_RHODS = 'katib/manifests/v1beta1/installs/katib-rhods'
@@ -100,6 +101,23 @@ def check_deployment(namespace_to_check: str, deployment_name: str):
         exit(1)
 
 
+def check_workbench(namespace: str, workbench: str):
+    try:
+        print(f'{INFO} Checking for Workbench ... ', end='')
+        result = subprocess.check_output(
+            ['oc', '-n', namespace, 'get', 'statefulsets', '-o', 'name'],
+            universal_newlines=True)
+
+        statefulsets = result.strip().split('\n')
+        print(f"{DONE}")
+        if f"statefulset.apps/{workbench}" in statefulsets:
+            print(f"{INFO} Found Workbench: '{workbench}' in namespace: '{namespace}'")
+    except subprocess.CalledProcessError:
+        print(f"{FAILED}")
+        print(f"{ERR} Failed to get statefulsets")
+        exit(1)
+
+
 def check_and_add_label(namespace_to_check: str, label: str, value: str):
     try:
         print(f'{INFO} Checking for Label ... ', end='')
@@ -127,7 +145,8 @@ def check_and_add_label(namespace_to_check: str, label: str, value: str):
 
 def copy_yaml(src_file: str, dst_file: str):
     try:
-        print(f'{INFO} Copying YAML {Color.YELLOW}{src_file}{Color.END} to {Color.YELLOW}{dst_file}{Color.END} ... ', end='')
+        print(f'{INFO} Copying YAML {Color.YELLOW}{src_file}{Color.END} to {Color.YELLOW}{dst_file}{Color.END} ... ',
+              end='')
         with open(src_file, 'r') as file:
             data = yaml.safe_load(file)
 
@@ -146,7 +165,8 @@ def copy_yaml(src_file: str, dst_file: str):
 
 def modify_yaml(src_file: str, dst_file: str, target_namespace: str):
     try:
-        print(f'{INFO} Modifying YAML {Color.YELLOW}{src_file}{Color.END} to {Color.YELLOW}{dst_file}{Color.END} ... ', end='')
+        print(f'{INFO} Modifying YAML {Color.YELLOW}{src_file}{Color.END} to {Color.YELLOW}{dst_file}{Color.END} ... ',
+              end='')
         with open(src_file, 'r') as file:
             data = yaml.safe_load(file)
 
@@ -167,7 +187,7 @@ def modify_yaml(src_file: str, dst_file: str, target_namespace: str):
         exit(1)
 
 
-def apply_yamls(directory: str):
+def apply_kustomise_yamls(directory: str):
     try:
         print(f'{INFO} Applying YAML files')
         subprocess.run(['oc', 'apply', '-k', directory], check=True)
@@ -175,6 +195,68 @@ def apply_yamls(directory: str):
     except subprocess.CalledProcessError:
         print(f"{ERR} Failed to apply YAML files")
         exit(1)
+
+
+def apply_role_binding(dst_file: str):
+    try:
+        print(f'{INFO} Applying YAML files')
+        subprocess.run(['oc', 'apply', '-f', f'{dst_file}'], check=True)
+        print(f"{INFO} Successfully applied YAML file : '{Color.YELLOW}{dst_file}{Color.END}'")
+    except subprocess.CalledProcessError:
+        print(f"{ERR} Failed to apply role binding YAML file")
+        exit(1)
+
+
+def create_and_apply_role_binding_yaml(namespace: str, workbench: str):
+    if namespace is None or namespace == '' or workbench is None or workbench == '':
+        return
+    file_to_write = f'{KATIB_RHODS}/{ROLE_BINDING_FILE_NAME}'
+    create_role_binding_yaml(namespace=namespace, workbench=workbench, file_to_write=file_to_write)
+    apply_role_binding(dst_file=file_to_write)
+
+
+def create_role_binding_yaml(namespace: str, workbench: str, file_to_write: str):
+    if os.path.exists(file_to_write):
+        os.remove(file_to_write)
+
+    ROLE_BINDING_CONTENT = f'''
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: {namespace}
+  name: katib-groups-reader
+rules:
+  - apiGroups:
+    - kubeflow.org
+  resources:
+    - experiments
+    - experiments/status
+    - experiments/finalizers
+    - trials
+    - trials/status
+    - trials/finalizers
+    - suggestions
+    - suggestions/status
+    - suggestions/finalizers
+  verbs:
+    - "*"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: katib-groups-reader-binding
+  namespace: {namespace}
+subjects:
+  - kind: ServiceAccount
+    name: {workbench}
+    namespace: {namespace}
+roleRef:
+  kind: Role
+  name: katib-groups-reader
+  apiGroup: rbac.authorization.k8s.io
+'''
+    with open(file_to_write, 'w') as file:
+        file.write(ROLE_BINDING_CONTENT)
 
 
 def check_git():
@@ -238,14 +320,28 @@ parser.add_argument('--namespace',
                     required=True,
                     help='Name of the namespace where katib needs to be installed')
 
+parser.add_argument('--workbench',
+                    required=True,
+                    help='The workbench parameter.')
+
 entry()
 
 args = parser.parse_args()
 
 namespace = args.namespace
+workbench = args.workbench
+
+if namespace is None or namespace == '':
+    print(f'{ERR} Namespace cannot be empty. Please try again')
+    exit(1)
+
+if workbench is None or workbench == '':
+    print(f'{ERR} Workbench cannot be empty. Please try again')
+    exit(1)
 
 check_oc()
 check_namespace(namespace)
+check_workbench(namespace=namespace, workbench=workbench)
 check_deployment(namespace, DN_KATIB_CONTROLLER)
 check_and_add_label(namespace_to_check=namespace,
                     label=KATIB_INJECTION_LABEL_KEY,
@@ -266,4 +362,6 @@ modify_yaml(src_file=f'{KATIB_STANDALONE}/{KUSTOMIZATION_FILE_NAME}',
             dst_file=f'{KATIB_RHODS}/{KUSTOMIZATION_FILE_NAME}',
             target_namespace=namespace)
 
-apply_yamls(directory=KATIB_RHODS)
+apply_kustomise_yamls(directory=KATIB_RHODS)
+
+create_and_apply_role_binding_yaml(namespace=namespace, workbench=workbench)
