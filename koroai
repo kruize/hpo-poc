@@ -232,7 +232,7 @@ metadata:
 rules:
   - apiGroups:
       - kubeflow.org
-  - resources:
+    resources:
       - experiments
       - experiments/status
       - experiments/finalizers
@@ -242,9 +242,8 @@ rules:
       - suggestions
       - suggestions/status
       - suggestions/finalizers
-  - verbs:
+    verbs:
       - "*"
-
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
