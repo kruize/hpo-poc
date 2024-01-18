@@ -112,6 +112,9 @@ def check_workbench(namespace: str, workbench: str):
         print(f"{DONE}")
         if f"statefulset.apps/{workbench}" in statefulsets:
             print(f"{INFO} Found Workbench: '{workbench}' in namespace: '{namespace}'")
+        else:
+            print(f"{ERR} Workbench: '{workbench}' not found in namespace: '{namespace}'")
+            exit(1)
     except subprocess.CalledProcessError:
         print(f"{FAILED}")
         print(f"{ERR} Failed to get statefulsets")
