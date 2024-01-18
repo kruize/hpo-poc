@@ -223,6 +223,7 @@ def create_role_binding_yaml(namespace: str, workbench: str, file_to_write: str)
         os.remove(file_to_write)
 
     ROLE_BINDING_CONTENT = f'''
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -230,19 +231,20 @@ metadata:
   name: katib-groups-reader
 rules:
   - apiGroups:
-    - kubeflow.org
-  resources:
-    - experiments
-    - experiments/status
-    - experiments/finalizers
-    - trials
-    - trials/status
-    - trials/finalizers
-    - suggestions
-    - suggestions/status
-    - suggestions/finalizers
-  verbs:
-    - "*"
+      - kubeflow.org
+  - resources:
+      - experiments
+      - experiments/status
+      - experiments/finalizers
+      - trials
+      - trials/status
+      - trials/finalizers
+      - suggestions
+      - suggestions/status
+      - suggestions/finalizers
+  - verbs:
+      - "*"
+
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -258,6 +260,7 @@ roleRef:
   name: katib-groups-reader
   apiGroup: rbac.authorization.k8s.io
 '''
+
     with open(file_to_write, 'w') as file:
         file.write(ROLE_BINDING_CONTENT)
 
