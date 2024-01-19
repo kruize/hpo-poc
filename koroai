@@ -327,7 +327,7 @@ parser.add_argument('--namespace',
 
 parser.add_argument('--workbench',
                     required=True,
-                    help='The workbench parameter.')
+                    help='Name of the workbench which needs to access katib via SDK.')
 
 entry()
 
