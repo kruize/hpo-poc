@@ -1,0 +1,78 @@
+apiVersion: kubeflow.org/v1beta1
+kind: Experiment
+metadata:
+  name: random-experiment
+  namespace: ''
+spec:
+  maxTrialCount: 12
+  parallelTrialCount: 3
+  maxFailedTrialCount: 3
+  resumePolicy: Never
+  objective:
+    type: minimize
+    goal: 0.01
+    objectiveMetricName: loss
+    additionalMetricNames: []
+  algorithm:
+    algorithmName: bayesianoptimization
+    algorithmSettings:
+      - name: base_estimator
+        value: GP
+      - name: n_initial_points
+        value: '10'
+      - name: acq_func
+        value: gp_hedge
+      - name: acq_optimizer
+        value: auto
+  parameters:
+    - name: lr
+      parameterType: double
+      feasibleSpace:
+        min: '0.01'
+        max: '0.03'
+        step: '0.01'
+  metricsCollectorSpec:
+    collector:
+      kind: StdOut
+  trialTemplate:
+    primaryContainerName: training-container
+    successCondition: status.conditions.#(type=="Complete")#|#(status=="True")#
+    failureCondition: status.conditions.#(type=="Failed")#|#(status=="True")#
+    retain: false
+    trialParameters:
+      - name: learningRate
+        reference: lr
+        description: ''
+    trialSpec:
+      apiVersion: kubeflow.org/v1
+      kind: PyTorchJob
+      spec:
+        pytorchReplicaSpecs:
+          Master:
+            replicas: 1
+            restartPolicy: OnFailure
+            template:
+              spec:
+                containers:
+                  - name: pytorch
+                    image: docker.io/kubeflowkatib/pytorch-mnist-cpu:v0.16.0
+                    command:
+                      - python3
+                      - /opt/pytorch-mnist/mnist.py
+                      - '--epochs=1'
+                      - '--lr=${trialParameters.learningRate}'
+                      - '--momentum=0.5'
+          Worker:
+            replicas: 2
+            restartPolicy: OnFailure
+            template:
+              spec:
+                containers:
+                  - name: pytorch
+                    image: docker.io/kubeflowkatib/pytorch-mnist-cpu:v0.16.0
+                    command:
+                      - python3
+                      - /opt/pytorch-mnist/mnist.py
+                      - '--epochs=1'
+                      - '--lr=${trialParameters.learningRate}'
+                      - '--momentum=0.5'
