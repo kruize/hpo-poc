@@ -16,10 +16,49 @@ This code primarily focuses on optimizing machine learning models using RayTune.
 2. **Authentication**: It sets up authentication for accessing the cluster. Replace the `TOKEN` and `SERVER` values with actual authentication tokens and server URLs.
 3. **Cluster Configuration**: Configures the Ray cluster with the desired parameters such as number of workers, CPU and memory allocation.
 4. **Cluster Deployment**: Brings up the Ray cluster using the configuration defined.
-5. **Hyperparameter Tuning**: Uses Ray Tune to perform hyperparameter tuning on a simple neural network model.
+5. **Hyperparameter Tuning & log Metadata**: Uses Ray Tune to perform hyperparameter tuning on a simple neural network model while concurrently logging metadata.
 6. **Model Deployment**: Saves the best model obtained from hyperparameter tuning in the ONNX format and uploads it to an S3 bucket.
 7. **REST API Integration**: Sets up details to access the deployed model through a REST API.
 
+## Logging Metadata
+
+Logging metadata is crucial for tracking the lineage, provenance, and performance of machine learning models. Use the provided functions or methods to log metadata during different stages of your workflow:
+
+- Define Metadata Types: Define the metadata types for artifacts and contexts. Artifacts include HPOConfig, DataSet, Metrics, Model; Contexts inclue HPOTrial, HPOExperiment and HPOTrainer as ExecutionType using metadata store service.
+- Create Parent Context: Create a parent context to associate trial contexts with the experiment context.
+- Log Inputs and Outputs: Log input artifacts(DataSet, HPOCOnfig), events, and executions(HPOTrainer) when training and evaluating models.
+- Log output artifacts, such as trained models and evaluation metrics, after model training and evaluation.
+- Retrieve Artifacts and Contexts: Retrieve artifacts and contexts from the model registry based on specific conditions or trial names.
+
+
+## Working with Model Registry
+
+### Setting Up Model Registry
+
+To install the Model Registry Controller, follow these steps:
+
+1. Clone and navigate to the Model Registry Operator repository:
+
+    ```bash
+    git clone https://github.com/opendatahub-io/model-registry-operator.git
+    cd model-registry-operator
+    ```
+2. Use the provided Makefile to deploy the operator. Specify the image location using the `IMG` argument. For example, to deploy from a latest image hosted on Quay.io, run:
+
+    ```bash
+    make deploy IMG=quay.io/opendatahub/model-registry-operator
+    ```
+
+This command will deploy the Model Registry Controller using the specified image.
+
+### Starting the Model Registry Service
+
+After deploying the Model Registry Controller, you can start the Model Registry service with either PostgreSQL or MySQL as the backend database.
+To start the Model Registry service with PostgreSQL, use the following command:
+
+```bash
+kubectl apply -k config/samples/postgres
+```
 
 ## Note
 
@@ -28,4 +67,5 @@ This code primarily focuses on optimizing machine learning models using RayTune.
 - Make sure to replace placeholder values such as `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_ENDPOINT`, `AWS_DEFAULT_REGION`, and `AWS_S3_BUCKET` with your actual AWS credentials and bucket details.
 
 By following these instructions, you can effectively leverage the provided code to discover the optimal model using RayTune and subsequently deploy and serve machine learning models using Ray and the CodeFlare SDK.
+
 
