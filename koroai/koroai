@@ -2,6 +2,8 @@
 
 import os
 import json
+import time
+
 import yaml
 import argparse
 import shutil
@@ -10,6 +12,10 @@ import subprocess
 default_dir_name = 'katib'
 default_tag = 'v0.16.0'
 default_repo = 'https://github.com/kubeflow/katib.git'
+
+training_operator_dir = "training-operator"
+training_operator_tag = "v1.7.0"
+training_operator_repo = "https://github.com/kubeflow/training-operator.git"
 
 DN_KATIB_CONTROLLER = 'katib-controller'
 DN_KATIB_DB_MAN = 'katib-db-manager'
@@ -25,6 +31,9 @@ ROLE_BINDING_FILE_NAME = "wrk-bench-role-binding.yaml"
 
 KATIB_STANDALONE = 'katib/manifests/v1beta1/installs/katib-standalone'
 KATIB_RHODS = 'katib/manifests/v1beta1/installs/katib-rhods'
+
+TO_STANDALONE = 'training-operator/manifests/overlays/standalone'
+TO_RHODS = 'training-operator/manifests/overlays/rhods'
 
 
 class Color:
@@ -166,7 +175,7 @@ def copy_yaml(src_file: str, dst_file: str):
         exit(1)
 
 
-def modify_yaml(src_file: str, dst_file: str, target_namespace: str):
+def modify_yaml(src_file: str, dst_file: str, target_namespace: str, is_training_operator: bool = False):
     try:
         print(f'{INFO} Modifying YAML {Color.YELLOW}{src_file}{Color.END} to {Color.YELLOW}{dst_file}{Color.END} ... ',
               end='')
@@ -175,7 +184,10 @@ def modify_yaml(src_file: str, dst_file: str, target_namespace: str):
 
         data['namespace'] = target_namespace
 
-        data['resources'].remove('../../components/namespace/')
+        if is_training_operator:
+            data['resources'].remove('namespace.yaml')
+        else:
+            data['resources'].remove('../../components/namespace/')
 
         os.makedirs(os.path.dirname(dst_file), exist_ok=True)
 
@@ -294,11 +306,11 @@ def entry():
          888`88b.    888      888  888`88b.    888      888   .88ooo8888.    888  
          888  `88b.  `88b    d88'  888  `88b.  `88b    d88'  .8'     `888.   888  
         o888o  o888o  `Y8bood8P'  o888o  o888o  `Y8bood8P'  o88o     o8888o o888o
-        
-        
+
+
         Welcome to KOROAI Tool! 
         For Usage: koroai -h
-        
+
         Koroai expects OpenShift Client is installed and logged in to a OpenShift Cluster
     """)
 
@@ -355,10 +367,16 @@ check_and_add_label(namespace_to_check=namespace,
 if args.nocache and os.path.isdir(default_dir_name):
     print(f"{INFO} Deleting existing cache: {default_dir_name}")
     shutil.rmtree(default_dir_name)
+    print(f"{INFO} Deleting existing cache: {training_operator_dir}")
+    shutil.rmtree(training_operator_dir)
 
 if not os.path.isdir(default_dir_name):
     check_git()
     clone_tag(args.repo, args.tag, args.target)
+
+if not os.path.isdir(training_operator_dir):
+    check_git()
+    clone_tag(training_operator_repo, training_operator_tag, f'./{training_operator_dir}')
 
 copy_yaml(src_file=f'{KATIB_STANDALONE}/{KATIB_CONFIG_FILE_NAME}',
           dst_file=f'{KATIB_RHODS}/{KATIB_CONFIG_FILE_NAME}')
@@ -367,6 +385,19 @@ modify_yaml(src_file=f'{KATIB_STANDALONE}/{KUSTOMIZATION_FILE_NAME}',
             dst_file=f'{KATIB_RHODS}/{KUSTOMIZATION_FILE_NAME}',
             target_namespace=namespace)
 
+modify_yaml(src_file=f'{TO_STANDALONE}/{KUSTOMIZATION_FILE_NAME}',
+            dst_file=f'{TO_RHODS}/{KUSTOMIZATION_FILE_NAME}',
+            target_namespace=namespace,
+            is_training_operator=True)
+
+print(f'Installing Training Operator')
+apply_kustomise_yamls(directory=TO_RHODS)
+
+print(f'Pausing Katib deployment for 15 secs to make sure training operator is up and running ... ', end='')
+time.sleep(15)
+print(f'Done.')
+
+print(f'Installing KATIB')
 apply_kustomise_yamls(directory=KATIB_RHODS)
 
 create_and_apply_role_binding_yaml(namespace=namespace, workbench=workbench)
