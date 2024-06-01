@@ -15,7 +15,7 @@ This code primarily focuses on optimizing machine learning models using RayTune.
 1. **Installation**: The code starts by installing the necessary dependencies using `pip`.
 2. **Authentication**: It sets up authentication for accessing the cluster. Replace the `TOKEN` and `SERVER` values with actual authentication tokens and server URLs.
 3. **Cluster Configuration**: Configures the Ray cluster with the desired parameters such as number of workers, CPU and memory allocation.
-4. **Cluster Deployment**: Brings up the Ray cluster using the configuration defined.
+4. **Cluster Deployment**: Brings up the Ray cluster using the configuration defined. While initializing the Ray cluster, you need to specify `protobuf` version `3.20.1` in the `runtime_env` parameter during Ray initialization. This ensures that the correct version of `protobuf` is used, avoiding the `RayTaskError` issues.
 5. **Hyperparameter Tuning & log Metadata**: Uses Ray Tune to perform hyperparameter tuning on a simple neural network model while concurrently logging metadata.
 6. **Model Deployment**: Saves the best model obtained from hyperparameter tuning in the ONNX format and uploads it to an S3 bucket.
 7. **REST API Integration**: Sets up details to access the deployed model through a REST API.
