@@ -68,4 +68,8 @@ kubectl apply -k config/samples/postgres
 
 By following these instructions, you can effectively leverage the provided code to discover the optimal model using RayTune and subsequently deploy and serve machine learning models using Ray and the CodeFlare SDK.
 
+## Troubleshooting 
+
+- **RayTaskError or TypeError stating "Descriptors cannot be created directly."** 
+This error indicates compatibility issues with the protobuf library version used in your project. While initializing the Ray cluster, you need to specify `protobuf` version `3.20.1` in the `runtime_env` parameter during Ray initialization. This ensures that the correct version of `protobuf` is used, avoiding the `RayTaskError` issues.
 
