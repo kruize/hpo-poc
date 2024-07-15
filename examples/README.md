@@ -22,7 +22,7 @@ This example demonstrates how to use raytune for hyperparameter optimisation usi
 * Log in, then go to Data Science Projects and create a project:  
 ![](./docs/02.png)
 
-* Once the project is created, click on Create a workbench:
+* Once the project is created, click on Create a workbench:<br/><br/>
 ![](./docs/03.png)
 
 * Add a cluster storage:
