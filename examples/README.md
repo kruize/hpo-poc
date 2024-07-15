@@ -19,7 +19,7 @@ This example demonstrates how to use raytune for hyperparameter optimisation usi
 * Access the OpenShift AI dashboard, for example from the top navigation bar menu:
 ![](./docs/01.png)
 
-* Log in, then go to Data Science Projects and create a project: 
+* Log in, then go to Data Science Projects and create a project:  
 ![](./docs/02.png)
 
 * Once the project is created, click on Create a workbench:
@@ -31,7 +31,7 @@ This example demonstrates how to use raytune for hyperparameter optimisation usi
 * With the following details:
 ![](./docs/05.png)
 
-* Then create a workbench with the following settings:
+* Then create a workbench with the following settings:  
 ![](./docs/06.png)
 
 * Add data connection with relevant details of your S3 storage bucket:
@@ -80,7 +80,7 @@ kubectl apply -k config/samples/postgres
     * Raytune-oai-demo-mlmd.ipynb
     * Raytune-oai-MR-gRPC-demo.ipynb
 
-* In the openshift console open “copy login token”:
+* In the openshift console open “copy login token”:  
 ![](./docs/12.png)
 
 * Replace the TOKEN and SERVER variables with those from the login command:
