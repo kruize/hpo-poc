@@ -85,7 +85,9 @@ kubectl apply -k config/samples/postgres
 * Replace the TOKEN and SERVER variables with those from the login command (in order to allow the sdk to access the openshift cluster):
 ![](./docs/13.png)
 
-### When running the MR-gRPC example
+* Restart and run the kernel. The results should be printed at the bottom of the notebook. Depending on which demo was run the data will also be stored via the respective method.
+
+#### When running the MR-gRPC example
 Make sure to adjust the values provided in the following code snippet when running this example:
 ```
 # Use the default metadata types for Model and other metadata types that are part of the metadata database.
@@ -99,5 +101,4 @@ trainer_type_id = 26
 metrics_type_id = 27
 ```
 
-* Restart and run the kernel. The results should be printed at the bottom of the notebook. Depending on which demo was run the data will also be stored via the respective method.
 
