@@ -1,11 +1,6 @@
 # HPO with raytune POC on OpenShift AI
 
-This example primarily focuses on optimizing machine learning models using RayTune. It demonstrates the process of hyperparameter tuning to find the best-performing model configuration for a given model, leveraging the capabilities of RayCluster and CodeFlare. There are three examples provided, all of these have hidden layer size and learning rate as hyperparameters. The base demo will simply upload the model to the s3 bucket. The mlmd demo creates and stores the model into a mlmd store and the MR-gRPC using the MR API to do the same. 
-
-> [!IMPORTANT]
-> This example has been tested with the configurations listed in the [validation](#validation) section.
-> Its configuration space is highly dimensional, with application configuration tighly coupled to runtime / hardware configuration.
-> It is your responsibility to adapt it, and validate it works as expected, with your configuration(s), on your target environment(s).
+This example primarily focuses on optimizing machine learning models using RayTune. It demonstrates the process of hyperparameter tuning to find the best-performing model configuration for a given model, leveraging the capabilities of RayCluster and CodeFlare. There are three examples provided, all of these have hidden layer size and learning rate as hyperparameters. The base demo will simply upload the model to the s3 bucket. The mlmd demo creates and stores the model into a mlmd store and the MR-gRPC using the MR API to do the same. v
 
 ## Requirements
 
@@ -76,8 +71,8 @@ kubectl apply -k config/samples/postgres
 
 * Repeat the following steps for each of the three files:
     * Raytune-oai-demo.ipynb - base demo
-    * Raytune-oai-demo-mlmd.ipynb - stores and retrives all data in a mlmd store
-    * Raytune-oai-MR-gRPC-demo.ipynb - stores and retreives all data using the model registry api
+    * Raytune-oai-demo-mlmd.ipynb - stores and retrieves all data in a mlmd store
+    * Raytune-oai-MR-gRPC-demo.ipynb - stores and retrieves all data using the model registry api
 
 * In the openshift console open “copy login token”:  
 ![](./docs/12.png)
