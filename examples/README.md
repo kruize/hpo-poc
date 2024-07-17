@@ -87,7 +87,7 @@ kubectl apply -k config/samples/postgres
 
 * Restart and run the kernel. The results should be printed at the bottom of the notebook. Depending on which demo was run the data will also be stored via the respective method.
 
-#### When running the MR-gRPC example
+### When running the MR-gRPC example
 Make sure to adjust the values provided in the following code snippet when running this example:
 ```
 # Use the default metadata types for Model and other metadata types that are part of the metadata database.
